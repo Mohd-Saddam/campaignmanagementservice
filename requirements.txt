@@ -3,9 +3,9 @@
 # ============================================
 
 # --- Core Framework ---
-fastapi==0.115.6              # High-performance web framework for building APIs with automatic OpenAPI docs
-uvicorn==0.32.1               # ASGI server to run FastAPI application in production
-starlette==0.41.3             # Lightweight ASGI framework (required by FastAPI)
+fastapi==0.123.9              # High-performance web framework - LATEST (Dec 2025)
+uvicorn==0.38.0               # ASGI server - LATEST
+starlette==0.50.0             # Lightweight ASGI framework - LATEST
 
 # --- Database ---
 sqlalchemy==2.0.36            # SQL toolkit and ORM for database operations
@@ -13,9 +13,9 @@ psycopg2-binary==2.9.10       # PostgreSQL database adapter for Python
 alembic==1.14.0               # Database migration tool for SQLAlchemy
 
 # --- Data Validation ---
-pydantic==2.10.3              # Data validation using Python type annotations
+pydantic==2.12.5              # Data validation - LATEST
 pydantic-settings==2.6.1      # Settings management with environment variables support
-email-validator==2.1.0        # Email validation for Pydantic EmailStr
+email-validator==2.3.0        # Email validation for Pydantic EmailStr - LATEST
 python-dotenv==1.0.1          # Load environment variables from .env file
 
 # --- Security & Performance ---

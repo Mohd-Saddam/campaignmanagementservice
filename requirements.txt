@@ -1,0 +1,30 @@
+# ============================================
+# Campaign Management Service - Dependencies
+# ============================================
+
+# --- Core Framework ---
+fastapi==0.115.6              # High-performance web framework for building APIs with automatic OpenAPI docs
+uvicorn==0.32.1               # ASGI server to run FastAPI application in production
+starlette==0.41.3             # Lightweight ASGI framework (required by FastAPI)
+
+# --- Database ---
+sqlalchemy==2.0.36            # SQL toolkit and ORM for database operations
+psycopg2-binary==2.9.10       # PostgreSQL database adapter for Python
+alembic==1.14.0               # Database migration tool for SQLAlchemy
+
+# --- Data Validation ---
+pydantic==2.10.3              # Data validation using Python type annotations
+pydantic-settings==2.6.1      # Settings management with environment variables support
+python-dotenv==1.0.1          # Load environment variables from .env file
+
+# --- Security & Performance ---
+slowapi==0.1.9                # Rate limiting middleware to prevent API abuse
+python-multipart==0.0.18      # Required for form data parsing in FastAPI
+
+# --- Testing ---
+pytest==8.3.4                 # Testing framework for unit and integration tests
+httpx==0.28.1                 # HTTP client for testing FastAPI endpoints
+pytest-asyncio==0.24.0        # Async test support for pytest
+
+# --- Utilities ---
+python-dateutil==2.9.0.post0  # Extended datetime utilities for date parsing

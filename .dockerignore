@@ -1,0 +1,13 @@
+.venv
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+.env
+.env.example
+*.db
+.pytest_cache
+alembic/versions/__pycache__
+README.md
+tests/

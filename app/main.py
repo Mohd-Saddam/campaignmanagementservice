@@ -5,17 +5,19 @@ This is the main module that initializes and configures the FastAPI application.
 It sets up middleware, includes routers, and defines health check endpoints.
 """
 
-from fastapi import FastAPI, Request  # FastAPI framework
+from fastapi import FastAPI, Request, Depends  # FastAPI framework
 from fastapi.middleware.cors import CORSMiddleware  # CORS middleware for cross-origin requests
 from fastapi.responses import JSONResponse  # JSON response for error handling
 from slowapi import Limiter, _rate_limit_exceeded_handler  # Rate limiting
 from slowapi.util import get_remote_address  # Get client IP address
 from slowapi.errors import RateLimitExceeded  # Rate limit exception
 from starlette.middleware.base import BaseHTTPMiddleware  # Custom middleware base
+from sqlalchemy.orm import Session  # Database session type
+from sqlalchemy import text  # SQL text for raw queries
 import time  # For request timing
 import logging  # Logging support
 
-from app.database import engine, Base  # Database engine and base model
+from app.database import engine, Base, get_db  # Database engine, base model, session dependency
 from app.routers import campaigns, customers, discounts  # API route handlers
 
 # Configure logging
@@ -152,15 +154,22 @@ def root(request: Request):
 
 @app.get("/health", tags=["Health"])
 @limiter.limit("100/minute")  # Rate limit health checks
-def health_check(request: Request):
+def health_check(request: Request, db: Session = Depends(get_db)):
     """
     Detailed health check endpoint.
     
     Returns:
         dict: Detailed service status including database connection
     """
+    # Actually check database connection
+    try:
+        db.execute(text("SELECT 1"))
+        db_status = "connected"
+    except Exception as e:
+        db_status = f"error: {str(e)}"
+    
     return {
-        "status": "healthy",
-        "database": "connected",
+        "status": "healthy" if db_status == "connected" else "degraded",
+        "database": db_status,
         "version": "1.0.0"
     }

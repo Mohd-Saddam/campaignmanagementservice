@@ -118,6 +118,14 @@ def update_campaign(
     
     Only provide the fields you want to update.
     """
+    # Validate date range if both dates provided
+    if campaign_update.start_date and campaign_update.end_date:
+        if campaign_update.end_date <= campaign_update.start_date:
+            raise HTTPException(
+                status_code=400,
+                detail="end_date must be after start_date"
+            )
+    
     campaign = crud.update_campaign(db, campaign_id, campaign_update)
     if not campaign:
         raise HTTPException(status_code=404, detail="Campaign not found")

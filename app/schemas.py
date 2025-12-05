@@ -5,7 +5,7 @@ This module defines all Pydantic models for request/response validation.
 Schemas ensure data integrity and provide automatic API documentation.
 """
 
-from pydantic import BaseModel, Field, field_validator  # Pydantic base and validators
+from pydantic import BaseModel, Field, field_validator, EmailStr  # Pydantic base and validators
 from datetime import datetime  # Date and time handling
 from typing import Optional, List  # Type hints for optional fields and lists
 from enum import Enum  # Python enumeration support
@@ -43,8 +43,8 @@ class CampaignStatus(str, Enum):
 
 class CustomerBase(BaseModel):
     """Base schema for customer with common fields."""
-    email: str  # Customer email address
-    name: str  # Customer display name
+    email: EmailStr  # Customer email address (validated)
+    name: str = Field(..., min_length=1, max_length=100)  # Customer display name
 
 
 class CustomerCreate(CustomerBase):

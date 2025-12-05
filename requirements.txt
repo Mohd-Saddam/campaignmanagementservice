@@ -15,6 +15,7 @@ alembic==1.14.0               # Database migration tool for SQLAlchemy
 # --- Data Validation ---
 pydantic==2.10.3              # Data validation using Python type annotations
 pydantic-settings==2.6.1      # Settings management with environment variables support
+email-validator==2.1.0        # Email validation for Pydantic EmailStr
 python-dotenv==1.0.1          # Load environment variables from .env file
 
 # --- Security & Performance ---

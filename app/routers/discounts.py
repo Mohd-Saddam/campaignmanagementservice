@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Optional, List
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
 from app.database import get_db
 from app.schemas import (
     CartParameters, AvailableDiscountsResponse, AvailableDiscount,
-    DiscountUsageCreate, DiscountUsageResponse, DiscountType
+    DiscountUsageCreate, DiscountUsageResponse, EnhancedDiscountUsageResponse, DiscountType
 )
 from app import crud
 from app.models import DiscountType as ModelDiscountType
@@ -97,7 +97,7 @@ def get_available_discounts(request: Request, cart_params: CartParameters, db: S
     )
 
 
-@router.post("/apply", response_model=DiscountUsageResponse)
+@router.post("/apply", response_model=EnhancedDiscountUsageResponse)
 @limiter.limit("30/minute")  # Rate limit discount applications (more strict)
 def apply_discount(request: Request, usage: DiscountUsageCreate, db: Session = Depends(get_db)):
     """
@@ -155,16 +155,29 @@ def apply_discount(request: Request, usage: DiscountUsageCreate, db: Session = D
         usage.cart_value
     )
     
-    return db_usage
+    # Return enhanced response
+    return EnhancedDiscountUsageResponse(
+        id=db_usage.id,
+        campaign_id=db_usage.campaign_id,
+        customer_id=db_usage.customer_id,
+        discount_amount=db_usage.discount_amount,
+        original_amount=value,
+        final_amount=round(value - db_usage.discount_amount, 2),
+        used_at=db_usage.used_at,
+        campaign_name=campaign.name,
+        discount_type=DiscountType(campaign.discount_type.value),
+        customer_name=customer.name,
+        customer_email=customer.email
+    )
 
 
-@router.get("/usage/{customer_id}")
+@router.get("/usage/{customer_id}", response_model=List[EnhancedDiscountUsageResponse])
 def get_customer_discount_usage(
     customer_id: int,
     campaign_id: Optional[int] = None,
     db: Session = Depends(get_db)
 ):
-    """Get discount usage history for a customer."""
+    """Get discount usage history for a customer with full details."""
     customer = crud.get_customer(db, customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found")
@@ -174,13 +187,18 @@ def get_customer_discount_usage(
         usages = [u for u in usages if u.campaign_id == campaign_id]
     
     return [
-        DiscountUsageResponse(
+        EnhancedDiscountUsageResponse(
             id=u.id,
             campaign_id=u.campaign_id,
             customer_id=u.customer_id,
             discount_amount=u.discount_amount,
-            cart_value=u.cart_value,
-            used_at=u.used_at
+            original_amount=u.cart_value,
+            final_amount=round(u.cart_value - u.discount_amount, 2),
+            used_at=u.used_at,
+            campaign_name=u.campaign.name,
+            discount_type=DiscountType(u.campaign.discount_type.value),
+            customer_name=customer.name,
+            customer_email=customer.email
         )
         for u in usages
     ]

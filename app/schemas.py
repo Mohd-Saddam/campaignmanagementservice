@@ -236,6 +236,26 @@ class DiscountUsageResponse(BaseModel):
         from_attributes = True  # Enable ORM mode for SQLAlchemy models
 
 
+class EnhancedDiscountUsageResponse(BaseModel):
+    """
+    Enhanced schema for discount usage response with campaign and customer details.
+    """
+    id: int
+    campaign_id: int
+    customer_id: int
+    discount_amount: float
+    original_amount: float
+    final_amount: float
+    used_at: datetime
+    campaign_name: str
+    discount_type: DiscountType
+    customer_name: str
+    customer_email: str
+
+    class Config:
+        from_attributes = True
+
+
 # ============================================
 # Generic API Response Schema
 # ============================================

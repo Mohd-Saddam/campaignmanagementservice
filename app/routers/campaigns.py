@@ -18,7 +18,9 @@ router = APIRouter(prefix="/campaigns", tags=["Campaigns"])
 
 
 def campaign_to_response(campaign) -> CampaignResponse:
-    """Convert Campaign model to CampaignResponse."""
+    """Convert Campaign model to CampaignResponse with full customer details."""
+    from app.schemas import CustomerResponse
+    
     return CampaignResponse(
         id=campaign.id,
         name=campaign.name,
@@ -37,7 +39,15 @@ def campaign_to_response(campaign) -> CampaignResponse:
         status=campaign.status,
         created_at=campaign.created_at,
         updated_at=campaign.updated_at,
-        target_customer_ids=[c.id for c in campaign.target_customers] if campaign.target_customers else []
+        target_customer_ids=[c.id for c in campaign.target_customers] if campaign.target_customers else [],
+        targeted_customers=[
+            CustomerResponse(
+                id=c.id,
+                email=c.email,
+                name=c.name,
+                created_at=c.created_at
+            ) for c in campaign.target_customers
+        ] if campaign.target_customers else []
     )
 
 
@@ -70,6 +80,16 @@ def create_campaign(campaign: CampaignCreate, db: Session = Depends(get_db)):
             status_code=400,
             detail="target_customer_ids required for targeted campaigns"
         )
+    
+    # Verify all target customers exist
+    if campaign.is_targeted and campaign.target_customer_ids:
+        for customer_id in campaign.target_customer_ids:
+            customer = crud.get_customer(db, customer_id)
+            if not customer:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Target customer with ID {customer_id} not found"
+                )
     
     db_campaign = crud.create_campaign(db, campaign)
     return campaign_to_response(db_campaign)

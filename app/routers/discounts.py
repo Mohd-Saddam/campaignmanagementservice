@@ -184,7 +184,26 @@ def get_customer_discount_usage(
     
     usages = customer.discount_usages
     if campaign_id:
+        # Verify campaign exists
+        campaign = crud.get_campaign(db, campaign_id)
+        if not campaign:
+            raise HTTPException(status_code=404, detail=f"Campaign with ID {campaign_id} not found")
+        
         usages = [u for u in usages if u.campaign_id == campaign_id]
+        
+        # If no usage found for this specific campaign
+        if not usages:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No discount usage found for customer {customer_id} with campaign {campaign_id}"
+            )
+    
+    # If no usage at all
+    if not usages:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No discount usage history found for customer {customer_id}"
+        )
     
     return [
         EnhancedDiscountUsageResponse(

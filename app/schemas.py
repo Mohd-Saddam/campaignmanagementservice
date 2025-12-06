@@ -164,6 +164,7 @@ class CampaignResponse(BaseModel):
     created_at: datetime  # Creation timestamp
     updated_at: datetime  # Last update timestamp
     target_customer_ids: Optional[List[int]] = None  # List of targeted customer IDs
+    targeted_customers: Optional[List[CustomerResponse]] = None  # Full customer details
 
     class Config:
         from_attributes = True  # Enable ORM mode for SQLAlchemy models

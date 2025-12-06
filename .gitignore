@@ -34,5 +34,7 @@ build/
 *.log
 logs/
 test_all_apis.ps1
+
+# Documentation
 REQUIREMENTS_VERIFICATION.md
 REQUIREMENTS_COMPLIANCE_CHECKLIST.md

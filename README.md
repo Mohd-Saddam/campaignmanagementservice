@@ -1,4 +1,4 @@
-# Campaign Management Service
+﻿# Campaign Management Service
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.123.9-009688.svg?style=flat&logo=FastAPI)](https://fastapi.tiangolo.com)
 [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg?style=flat&logo=python)](https://www.python.org)

@@ -127,13 +127,16 @@ def create_campaign(db: Session, campaign: CampaignCreate) -> Campaign:
     campaign_data = campaign.model_dump(exclude={'target_customer_ids'})
     db_campaign = Campaign(**campaign_data)
     
-    # If campaign is targeted, add the target customers
+    # Handle targeted customers based on is_targeted flag
     if campaign.is_targeted and campaign.target_customer_ids:
         # Fetch all target customers from database
         target_customers = db.query(Customer).filter(
             Customer.id.in_(campaign.target_customer_ids)
         ).all()
         db_campaign.target_customers = target_customers
+    else:
+        # If not targeted, ensure no customer associations
+        db_campaign.target_customers = []
     
     db.add(db_campaign)  # Add to session
     db.commit()  # Save to database
@@ -210,12 +213,25 @@ def update_campaign(db: Session, campaign_id: int, campaign_update: CampaignUpda
     for field, value in update_data.items():
         setattr(db_campaign, field, value)
     
-    # Update target customers if specified
-    if campaign_update.target_customer_ids is not None:
-        target_customers = db.query(Customer).filter(
-            Customer.id.in_(campaign_update.target_customer_ids)
-        ).all()
-        db_campaign.target_customers = target_customers
+    # Handle targeted customers based on is_targeted flag
+    # If is_targeted is being set to False, clear all targeted customers
+    if 'is_targeted' in update_data and not update_data['is_targeted']:
+        db_campaign.target_customers = []
+    # If target_customer_ids is explicitly provided, update them
+    elif campaign_update.target_customer_ids is not None:
+        if len(campaign_update.target_customer_ids) > 0:
+            target_customers = db.query(Customer).filter(
+                Customer.id.in_(campaign_update.target_customer_ids)
+            ).all()
+            db_campaign.target_customers = target_customers
+        else:
+            # Empty list provided - clear all targeted customers
+            db_campaign.target_customers = []
+    # If is_targeted is True but campaign currently has no targeted customers
+    # and target_customer_ids is not provided, this is likely an error state
+    elif db_campaign.is_targeted and not db_campaign.target_customers:
+        # Keep it as is, but this should be validated at the API level
+        pass
     
     db_campaign.updated_at = datetime.utcnow()  # Update timestamp
     db.commit()

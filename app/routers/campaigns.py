@@ -25,6 +25,22 @@ def campaign_to_response(campaign) -> CampaignResponse:
     """Convert Campaign model to CampaignResponse with full customer details."""
     from app.schemas import CustomerResponse
     
+    # Only include targeted customers if campaign is actually targeted
+    # This prevents orphaned associations from showing in the API response
+    if campaign.is_targeted and campaign.target_customers:
+        target_customer_ids = [c.id for c in campaign.target_customers]
+        targeted_customers = [
+            CustomerResponse(
+                id=c.id,
+                email=c.email,
+                name=c.name,
+                created_at=c.created_at
+            ) for c in campaign.target_customers
+        ]
+    else:
+        target_customer_ids = []
+        targeted_customers = []
+    
     return CampaignResponse(
         id=campaign.id,
         name=campaign.name,
@@ -43,15 +59,8 @@ def campaign_to_response(campaign) -> CampaignResponse:
         status=campaign.status,
         created_at=campaign.created_at,
         updated_at=campaign.updated_at,
-        target_customer_ids=[c.id for c in campaign.target_customers] if campaign.target_customers else [],
-        targeted_customers=[
-            CustomerResponse(
-                id=c.id,
-                email=c.email,
-                name=c.name,
-                created_at=c.created_at
-            ) for c in campaign.target_customers
-        ] if campaign.target_customers else []
+        target_customer_ids=target_customer_ids,
+        targeted_customers=targeted_customers
     )
 
 
@@ -181,18 +190,81 @@ def update_campaign(
     
     Only provide the fields you want to update.
     """
+    logger.info(f"Updating campaign {campaign_id}: is_targeted={campaign_update.is_targeted}, target_customers={campaign_update.target_customer_ids}")
+    
     # Validate date range if both dates provided
     if campaign_update.start_date and campaign_update.end_date:
         if campaign_update.end_date <= campaign_update.start_date:
+            logger.log_validation_error(
+                entity="campaign",
+                field="date_range",
+                value=f"{campaign_update.start_date} - {campaign_update.end_date}",
+                reason="end_date must be after start_date"
+            )
             raise HTTPException(
                 status_code=400,
                 detail="end_date must be after start_date"
             )
     
-    campaign = crud.update_campaign(db, campaign_id, campaign_update)
-    if not campaign:
-        raise HTTPException(status_code=404, detail="Campaign not found")
-    return campaign_to_response(campaign)
+    # Validate targeted campaign logic
+    if campaign_update.is_targeted is True and campaign_update.target_customer_ids is not None:
+        if len(campaign_update.target_customer_ids) == 0:
+            logger.log_validation_error(
+                entity="campaign",
+                field="target_customer_ids",
+                value=None,
+                reason="Targeted campaigns must have at least one customer"
+            )
+            raise HTTPException(
+                status_code=400,
+                detail="Targeted campaigns must have at least one target customer"
+            )
+        
+        # Verify all target customers exist
+        for customer_id in campaign_update.target_customer_ids:
+            customer = crud.get_customer(db, customer_id)
+            if not customer:
+                logger.log_validation_error(
+                    entity="campaign",
+                    field="target_customer_ids",
+                    value=customer_id,
+                    reason="Customer not found"
+                )
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Target customer with ID {customer_id} not found"
+                )
+    
+    # If setting is_targeted to False, ensure target_customer_ids is also cleared
+    if campaign_update.is_targeted is False and campaign_update.target_customer_ids is None:
+        campaign_update.target_customer_ids = []
+        logger.info(f"Campaign {campaign_id} is_targeted=False, clearing target customers")
+    
+    try:
+        campaign = crud.update_campaign(db, campaign_id, campaign_update)
+        if not campaign:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        
+        logger.log_campaign_operation(
+            operation="update",
+            campaign_id=campaign.id,
+            campaign_name=campaign.name,
+            campaign_type=campaign.discount_type.value,
+            success=True
+        )
+        return campaign_to_response(campaign)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.log_campaign_operation(
+            operation="update",
+            campaign_id=campaign_id,
+            campaign_name="unknown",
+            campaign_type="unknown",
+            success=False,
+            error=str(e)
+        )
+        raise
 
 
 @router.delete("/{campaign_id}", status_code=204)

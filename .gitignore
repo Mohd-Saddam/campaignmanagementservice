@@ -38,3 +38,6 @@ test_all_apis.ps1
 # Documentation
 REQUIREMENTS_VERIFICATION.md
 REQUIREMENTS_COMPLIANCE_CHECKLIST.md
+BUGFIX_TARGETED_CUSTOMERS.md
+cleanup_orphaned_customers.py
+test_targeted_customers_fix.py

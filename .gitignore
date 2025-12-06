@@ -32,3 +32,5 @@ build/
 
 # Logs
 *.log
+logs/
+test_all_apis.ps1

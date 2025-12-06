@@ -14,6 +14,10 @@ from typing import List, Optional  # Type hints
 # Import models and schemas
 from app.models import Campaign, Customer, DiscountUsage, CampaignStatus, DiscountType, campaign_customers
 from app.schemas import CampaignCreate, CampaignUpdate, CustomerCreate
+from app.logger import get_logger  # Centralized logging
+
+# Get logger instance
+logger = get_logger(__name__)
 
 
 # ============================================
@@ -31,15 +35,34 @@ def create_customer(db: Session, customer: CustomerCreate) -> Customer:
     Returns:
         Customer: The created customer object
     """
-    # Create new Customer instance from request data
-    db_customer = Customer(
-        email=customer.email,
-        name=customer.name
-    )
-    db.add(db_customer)  # Add to session
-    db.commit()  # Save to database
-    db.refresh(db_customer)  # Refresh to get generated ID
-    return db_customer
+    try:
+        # Create new Customer instance from request data
+        db_customer = Customer(
+            email=customer.email,
+            name=customer.name
+        )
+        db.add(db_customer)  # Add to session
+        db.commit()  # Save to database
+        db.refresh(db_customer)  # Refresh to get generated ID
+        
+        logger.log_customer_operation(
+            operation="create",
+            customer_id=db_customer.id,
+            email=db_customer.email,
+            success=True
+        )
+        
+        return db_customer
+    except Exception as e:
+        db.rollback()
+        logger.log_customer_operation(
+            operation="create",
+            customer_id=None,
+            email=customer.email,
+            success=False,
+            error=str(e)
+        )
+        raise
 
 
 def get_customer(db: Session, customer_id: int) -> Optional[Customer]:

@@ -15,14 +15,16 @@ from starlette.middleware.base import BaseHTTPMiddleware  # Custom middleware ba
 from sqlalchemy.orm import Session  # Database session type
 from sqlalchemy import text  # SQL text for raw queries
 import time  # For request timing
-import logging  # Logging support
 
 from app.database import engine, Base, get_db  # Database engine, base model, session dependency
 from app.routers import campaigns, customers, discounts  # API route handlers
+from app.logger import get_logger  # Centralized logging system
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Get logger instance
+logger = get_logger(__name__)
+
+logger.info("Campaign Management Service Starting...")
+logger.info("Initializing database tables...")
 
 # Create all database tables defined in models
 # This is useful for development - in production, use Alembic migrations
@@ -69,23 +71,57 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
     
     async def dispatch(self, request: Request, call_next):
         start_time = time.time()
+        request_id = id(request)
+        
+        # Log incoming request
+        logger.info(
+            f"[REQ-{request_id}] {request.method} {request.url.path} "
+            f"from {request.client.host if request.client else 'unknown'}"
+        )
         
         # Process the request
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except Exception as e:
+            process_time = time.time() - start_time
+            logger.error(
+                f"[REQ-{request_id}] ERROR: {request.method} {request.url.path} - "
+                f"Exception: {str(e)} - Time: {process_time:.3f}s"
+            )
+            raise
         
         # Calculate processing time
         process_time = time.time() - start_time
         
-        # Log request details (only for API endpoints)
-        if request.url.path.startswith("/api"):
+        # Log request completion with details
+        if response.status_code < 400:
             logger.info(
-                f"{request.method} {request.url.path} - "
+                f"[REQ-{request_id}] {request.method} {request.url.path} - "
                 f"Status: {response.status_code} - "
-                f"Time: {process_time:.3f}s"
+                f"Time: {process_time:.3f}s - "
+                f"Client: {request.client.host if request.client else 'unknown'}"
             )
+        else:
+            logger.warning(
+                f"[REQ-{request_id}] {request.method} {request.url.path} - "
+                f"Status: {response.status_code} - "
+                f"Time: {process_time:.3f}s - "
+                f"Client: {request.client.host if request.client else 'unknown'}"
+            )
+        
+        # Log to API request log file
+        logger.log_request(
+            method=request.method,
+            path=request.url.path,
+            status_code=response.status_code,
+            process_time=process_time,
+            client_ip=request.client.host if request.client else 'unknown',
+            request_id=request_id
+        )
         
         # Add timing header to response
         response.headers["X-Process-Time"] = str(process_time)
+        response.headers["X-Request-ID"] = str(request_id)
         return response
 
 

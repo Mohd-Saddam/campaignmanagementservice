@@ -10,6 +10,10 @@ from app.schemas import (
     CampaignStatus, DiscountType
 )
 from app import crud
+from app.logger import get_logger
+
+# Get logger instance
+logger = get_logger(__name__)
 
 # Initialize rate limiter for this router
 limiter = Limiter(key_func=get_remote_address)
@@ -67,8 +71,16 @@ def create_campaign(campaign: CampaignCreate, db: Session = Depends(get_db)):
     - **is_targeted**: If true, only specified customers can use
     - **target_customer_ids**: List of customer IDs for targeted campaigns
     """
+    logger.info(f"Creating campaign: {campaign.name}, type={campaign.discount_type}, targeted={campaign.is_targeted}")
+    
     # Validate that at least one discount type is provided
     if not campaign.discount_percentage and not campaign.discount_flat:
+        logger.log_validation_error(
+            entity="campaign",
+            field="discount",
+            value=None,
+            reason="Either discount_percentage or discount_flat must be provided"
+        )
         raise HTTPException(
             status_code=400,
             detail="Either discount_percentage or discount_flat must be provided"
@@ -76,6 +88,12 @@ def create_campaign(campaign: CampaignCreate, db: Session = Depends(get_db)):
     
     # Validate target customers if campaign is targeted
     if campaign.is_targeted and not campaign.target_customer_ids:
+        logger.log_validation_error(
+            entity="campaign",
+            field="target_customer_ids",
+            value=None,
+            reason="Required for targeted campaigns"
+        )
         raise HTTPException(
             status_code=400,
             detail="target_customer_ids required for targeted campaigns"
@@ -83,16 +101,41 @@ def create_campaign(campaign: CampaignCreate, db: Session = Depends(get_db)):
     
     # Verify all target customers exist
     if campaign.is_targeted and campaign.target_customer_ids:
+        logger.info(f"Validating {len(campaign.target_customer_ids)} target customers for campaign: {campaign.name}")
         for customer_id in campaign.target_customer_ids:
             customer = crud.get_customer(db, customer_id)
             if not customer:
+                logger.log_validation_error(
+                    entity="campaign",
+                    field="target_customer_ids",
+                    value=customer_id,
+                    reason="Customer not found"
+                )
                 raise HTTPException(
                     status_code=404,
                     detail=f"Target customer with ID {customer_id} not found"
                 )
     
-    db_campaign = crud.create_campaign(db, campaign)
-    return campaign_to_response(db_campaign)
+    try:
+        db_campaign = crud.create_campaign(db, campaign)
+        logger.log_campaign_operation(
+            operation="create",
+            campaign_id=db_campaign.id,
+            campaign_name=db_campaign.name,
+            campaign_type=campaign.discount_type.value,
+            success=True
+        )
+        return campaign_to_response(db_campaign)
+    except Exception as e:
+        logger.log_campaign_operation(
+            operation="create",
+            campaign_id=None,
+            campaign_name=campaign.name,
+            campaign_type=campaign.discount_type.value,
+            success=False,
+            error=str(e)
+        )
+        raise
 
 
 @router.get("/", response_model=List[CampaignResponse])

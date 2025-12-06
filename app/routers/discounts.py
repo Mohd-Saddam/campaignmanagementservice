@@ -11,6 +11,10 @@ from app.schemas import (
 )
 from app import crud
 from app.models import DiscountType as ModelDiscountType
+from app.logger import get_logger
+
+# Get logger instance
+logger = get_logger(__name__)
 
 # Initialize rate limiter for this router
 limiter = Limiter(key_func=get_remote_address)
@@ -33,9 +37,15 @@ def get_available_discounts(request: Request, cart_params: CartParameters, db: S
     
     Returns both cart and delivery discounts with the best option highlighted.
     """
+    logger.info(
+        f"Checking available discounts for customer_id={cart_params.customer_id}, "
+        f"cart_value={cart_params.cart_value}, delivery_charge={cart_params.delivery_charge}"
+    )
+    
     # Verify customer exists
     customer = crud.get_customer(db, cart_params.customer_id)
     if not customer:
+        logger.warning(f"Customer not found: customer_id={cart_params.customer_id}")
         raise HTTPException(status_code=404, detail="Customer not found")
     
     # Get eligible cart discounts
@@ -45,6 +55,8 @@ def get_available_discounts(request: Request, cart_params: CartParameters, db: S
         cart_params.cart_value,
         ModelDiscountType.CART
     )
+    
+    logger.info(f"Found {len(cart_campaigns)} eligible cart campaigns for customer_id={cart_params.customer_id}")
     
     # Get eligible delivery discounts
     delivery_campaigns = crud.get_eligible_campaigns(
@@ -109,14 +121,21 @@ def apply_discount(request: Request, usage: DiscountUsageCreate, db: Session = D
     - Record the usage
     - Update the campaign's used budget
     """
+    logger.info(
+        f"Applying discount: campaign_id={usage.campaign_id}, "
+        f"customer_id={usage.customer_id}, cart_value={usage.cart_value}"
+    )
+    
     # Verify customer exists
     customer = crud.get_customer(db, usage.customer_id)
     if not customer:
+        logger.warning(f"Discount application failed - customer not found: {usage.customer_id}")
         raise HTTPException(status_code=404, detail="Customer not found")
     
     # Verify campaign exists
     campaign = crud.get_campaign(db, usage.campaign_id)
     if not campaign:
+        logger.warning(f"Discount application failed - campaign not found: {usage.campaign_id}")
         raise HTTPException(status_code=404, detail="Campaign not found")
     
     # Check eligibility using appropriate value based on discount type
@@ -130,6 +149,10 @@ def apply_discount(request: Request, usage: DiscountUsageCreate, db: Session = D
     )
     
     if campaign not in eligible_campaigns:
+        logger.warning(
+            f"Discount application failed - not eligible: "
+            f"campaign_id={usage.campaign_id}, customer_id={usage.customer_id}"
+        )
         raise HTTPException(
             status_code=400,
             detail="Customer is not eligible for this discount"
@@ -140,7 +163,13 @@ def apply_discount(request: Request, usage: DiscountUsageCreate, db: Session = D
     value = usage.cart_value if campaign.discount_type == ModelDiscountType.CART else usage.delivery_charge
     discount_amount = crud.calculate_discount_amount(campaign, value)
     
+    logger.info(
+        f"Discount calculated: campaign={campaign.name}, "
+        f"discount_amount={discount_amount}, original_value={value}"
+    )
+    
     if discount_amount <= 0:
+        logger.warning(f"Discount application failed - no discount available for campaign_id={usage.campaign_id}")
         raise HTTPException(
             status_code=400,
             detail="No discount available for this transaction"
@@ -153,6 +182,12 @@ def apply_discount(request: Request, usage: DiscountUsageCreate, db: Session = D
         usage.customer_id,
         discount_amount,
         usage.cart_value
+    )
+    
+    logger.info(
+        f"Discount applied successfully: usage_id={db_usage.id}, "
+        f"campaign={campaign.name}, customer={customer.email}, "
+        f"discount_amount={discount_amount}, final_amount={round(value - discount_amount, 2)}"
     )
     
     # Return enhanced response
